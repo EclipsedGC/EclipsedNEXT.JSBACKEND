@@ -194,6 +194,38 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_role_assignments_user ON role_assignments(user_id)
   `).run()
 
+  // Character enrichment cache table for external API data
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS character_enrichment_cache (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      region TEXT NOT NULL,
+      realm TEXT NOT NULL,
+      character_name TEXT NOT NULL,
+      season_key TEXT NOT NULL DEFAULT 'latest',
+      player_card TEXT DEFAULT '{}',
+      wcl_last_fetched_at TEXT,
+      blizzard_last_fetched_at TEXT,
+      fetch_status TEXT NOT NULL CHECK(fetch_status IN ('complete', 'partial', 'failed')) DEFAULT 'partial',
+      error_message TEXT,
+      created_at TEXT DEFAULT (DATETIME('now')),
+      updated_at TEXT DEFAULT (DATETIME('now')),
+      UNIQUE(region, realm, character_name, season_key)
+    )
+  `).run()
+
+  // Create indexes for character enrichment cache
+  db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_character_cache_lookup ON character_enrichment_cache(region, realm, character_name)
+  `).run()
+
+  db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_character_cache_season ON character_enrichment_cache(season_key)
+  `).run()
+
+  db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_character_cache_status ON character_enrichment_cache(fetch_status)
+  `).run()
+
   // Insert default "about-us" content if not exists
   db.prepare(`
     INSERT OR IGNORE INTO site_content (key, title, content)
