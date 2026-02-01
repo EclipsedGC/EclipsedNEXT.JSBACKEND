@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth System Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        .section {
+            background: #16213e;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #0f3460;
+        }
+        button {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #7c3aed;
+        }
+        .result {
+            background: #0f3460;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #0f3460;
+            border: 1px solid #8b5cf6;
+            color: white;
+            border-radius: 4px;
+        }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        h1 { color: #8b5cf6; }
+        h2 { color: #a78bfa; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Auth System Test Page</h1>
+    <p>Use this page to test your rank-based access control system</p>
+
+    <!-- Step 1: Create Guild Master -->
+    <div class="section">
+        <h2>Step 1: Create Initial Guild Master</h2>
+        <p>Click this ONCE to create your first user</p>
+        <button onclick="createGuildMaster()">Create Guild Master</button>
+        <div id="seedResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Step 2: Login -->
+    <div class="section">
+        <h2>Step 2: Login</h2>
+        <input type="text" id="loginUsername" placeholder="Username" value="guildmaster">
+        <input type="password" id="loginPassword" placeholder="Password" value="changeme123">
+        <button onclick="login()">Login</button>
+        <div id="loginResult" class="result" style="display: none;"></div>
+        <div id="tokenDisplay" class="result" style="display: none;">
+            <strong>Your Token (save this!):</strong><br>
+            <span id="tokenValue"></span>
+        </div>
+    </div>
+
+    <!-- Step 3: Create Team -->
+    <div class="section">
+        <h2>Step 3: Create a Team</h2>
+        <input type="text" id="teamName" placeholder="Team Name" value="Alpha Team">
+        <input type="text" id="teamDesc" placeholder="Description" value="Main raid team">
+        <button onclick="createTeam()">Create Team</button>
+        <div id="teamResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Step 4: Create User -->
+    <div class="section">
+        <h2>Step 4: Create a User</h2>
+        <input type="text" id="newUsername" placeholder="Username" value="teamlead1">
+        <input type="password" id="newPassword" placeholder="Password" value="secure123">
+        <select id="newRank" style="width: 100%; padding: 8px; margin: 5px 0; background: #0f3460; border: 1px solid #8b5cf6; color: white; border-radius: 4px;">
+            <option value="GUILD_MASTER">Guild Master</option>
+            <option value="COUNCIL">Council</option>
+            <option value="TEAM_LEAD" selected>Team Lead</option>
+        </select>
+        <input type="number" id="newTeamId" placeholder="Team ID (for Team Lead only)" value="1">
+        <button onclick="createUser()">Create User</button>
+        <div id="userResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Step 5: Get All Teams -->
+    <div class="section">
+        <h2>Step 5: View Teams</h2>
+        <button onclick="getTeams()">Get All Teams</button>
+        <div id="teamsResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Step 6: Get All Users -->
+    <div class="section">
+        <h2>Step 6: View Users</h2>
+        <button onclick="getUsers()">Get All Users</button>
+        <div id="usersResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        let currentToken = null;
+
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = 'result ' + (isError ? 'error' : 'success');
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function createGuildMaster() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/seed`, {
+                    method: 'POST'
+                });
+                
+                // Check if response has content
+                const text = await response.text();
+                if (!text) {
+                    showResult('seedResult', { error: 'Empty response from server' }, true);
+                    return;
+                }
+                
+                const data = JSON.parse(text);
+                showResult('seedResult', data, !data.success);
+            } catch (error) {
+                showResult('seedResult', { error: error.message }, true);
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const text = await response.text();
+                if (!text) {
+                    showResult('loginResult', { error: 'Empty response from server' }, true);
+                    return;
+                }
+                
+                const data = JSON.parse(text);
+                
+                if (data.success) {
+                    currentToken = data.data.token;
+                    document.getElementById('tokenValue').textContent = currentToken;
+                    document.getElementById('tokenDisplay').style.display = 'block';
+                }
+                
+                showResult('loginResult', data, !data.success);
+            } catch (error) {
+                showResult('loginResult', { error: error.message }, true);
+            }
+        }
+
+        async function createTeam() {
+            if (!currentToken) {
+                alert('Please login first!');
+                return;
+            }
+
+            const name = document.getElementById('teamName').value;
+            const description = document.getElementById('teamDesc').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/teams`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify({ name, description })
+                });
+                const data = await response.json();
+                showResult('teamResult', data, !data.success);
+            } catch (error) {
+                showResult('teamResult', { error: error.message }, true);
+            }
+        }
+
+        async function createUser() {
+            if (!currentToken) {
+                alert('Please login first!');
+                return;
+            }
+
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            const rank = document.getElementById('newRank').value;
+            const teamId = document.getElementById('newTeamId').value;
+
+            const body = { username, password, rank };
+            if (rank === 'TEAM_LEAD' && teamId) {
+                body.teamId = parseInt(teamId);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                showResult('userResult', data, !data.success);
+            } catch (error) {
+                showResult('userResult', { error: error.message }, true);
+            }
+        }
+
+        async function getTeams() {
+            if (!currentToken) {
+                alert('Please login first!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/teams`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                const data = await response.json();
+                showResult('teamsResult', data, !data.success);
+            } catch (error) {
+                showResult('teamsResult', { error: error.message }, true);
+            }
+        }
+
+        async function getUsers() {
+            if (!currentToken) {
+                alert('Please login first!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/users`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                const data = await response.json();
+                showResult('usersResult', data, !data.success);
+            } catch (error) {
+                showResult('usersResult', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+# Overview
+
+backend only ever returns JSON
