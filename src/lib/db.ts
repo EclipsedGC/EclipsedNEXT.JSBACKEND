@@ -198,6 +198,7 @@ function initSchema() {
   db.prepare(`
     CREATE TABLE IF NOT EXISTS character_enrichment_cache (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id TEXT,
       region TEXT NOT NULL,
       realm TEXT NOT NULL,
       character_name TEXT NOT NULL,
@@ -212,10 +213,25 @@ function initSchema() {
       UNIQUE(region, realm, character_name, season_key)
     )
   `).run()
+  
+  // Add character_id column if it doesn't exist (migration)
+  try {
+    db.prepare(`ALTER TABLE character_enrichment_cache ADD COLUMN character_id TEXT`).run()
+    console.log('✅ Added character_id column to character_enrichment_cache')
+  } catch (error: any) {
+    // Column already exists or other error
+    if (!error.message?.includes('duplicate column')) {
+      console.log('ℹ️  character_id column already exists or migration not needed')
+    }
+  }
 
   // Create indexes for character enrichment cache
   db.prepare(`
     CREATE INDEX IF NOT EXISTS idx_character_cache_lookup ON character_enrichment_cache(region, realm, character_name)
+  `).run()
+  
+  db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_character_cache_id ON character_enrichment_cache(character_id)
   `).run()
 
   db.prepare(`
@@ -224,6 +240,26 @@ function initSchema() {
 
   db.prepare(`
     CREATE INDEX IF NOT EXISTS idx_character_cache_status ON character_enrichment_cache(fetch_status)
+  `).run()
+
+  // Season Config table for raid tier configuration
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS season_config (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tier_name TEXT NOT NULL,
+      wcl_tier_url TEXT NOT NULL,
+      wcl_zone_id INTEGER NOT NULL,
+      encounter_order TEXT NOT NULL DEFAULT '[]',
+      encounter_names TEXT NOT NULL DEFAULT '[]',
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (DATETIME('now')),
+      updated_at TEXT DEFAULT (DATETIME('now'))
+    )
+  `).run()
+
+  // Create index for active season config
+  db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_season_config_active ON season_config(is_active)
   `).run()
 
   // Insert default "about-us" content if not exists

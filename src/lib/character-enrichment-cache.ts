@@ -47,9 +47,10 @@ export async function createCacheEntry(
 
   const result = await execute(
     `INSERT INTO character_enrichment_cache 
-     (region, realm, character_name, season_key, player_card, wcl_last_fetched_at, blizzard_last_fetched_at, fetch_status, error_message)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (character_id, region, realm, character_name, season_key, player_card, wcl_last_fetched_at, blizzard_last_fetched_at, fetch_status, error_message)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
+      data.character_id || null,
       data.region,
       data.realm,
       data.character_name,
@@ -86,6 +87,10 @@ export async function updateCacheEntry(
   const fields: string[] = []
   const values: any[] = []
 
+  if (updates.character_id !== undefined) {
+    fields.push('character_id = ?')
+    values.push(updates.character_id)
+  }
   if (updates.player_card !== undefined) {
     fields.push('player_card = ?')
     values.push(JSON.stringify(updates.player_card))

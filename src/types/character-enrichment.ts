@@ -8,6 +8,7 @@ export type FetchStatus = 'complete' | 'partial' | 'failed'
 
 export interface CharacterEnrichmentCache {
   id: number
+  character_id: string | null // WCL character ID for stable identification
   region: string
   realm: string
   character_name: string
@@ -22,6 +23,7 @@ export interface CharacterEnrichmentCache {
 }
 
 export interface CharacterEnrichmentCacheCreate {
+  character_id?: string | null
   region: string
   realm: string
   character_name: string
@@ -34,6 +36,7 @@ export interface CharacterEnrichmentCacheCreate {
 }
 
 export interface CharacterEnrichmentCacheUpdate {
+  character_id?: string | null
   player_card?: Record<string, any>
   wcl_last_fetched_at?: string | null
   blizzard_last_fetched_at?: string | null

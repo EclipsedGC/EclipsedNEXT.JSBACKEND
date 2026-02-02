@@ -2,15 +2,24 @@
  * Warcraft Logs Character URL Parser
  * 
  * Parses and validates Warcraft Logs character profile URLs.
- * Expected format: https://www.warcraftlogs.com/character/{region}/{realm}/{characterName}
- * or: https://www.warcraftlogs.com/character/us/{realm}/{characterName}
+ * Supports two formats:
+ * 1. Full format: https://www.warcraftlogs.com/character/{region}/{realm}/{characterName}
+ * 2. ID format: https://www.warcraftlogs.com/character/id/{characterId}
  */
 
-export interface ParsedWarcraftLogsCharacter {
-  region: string
-  realm: string
-  characterName: string
-}
+export type ParsedWarcraftLogsUrl = 
+  | {
+      type: 'slug'
+      region: string
+      realm: string
+      characterName: string
+      originalUrl: string
+    }
+  | {
+      type: 'id'
+      characterId: string
+      originalUrl: string
+    }
 
 /**
  * Valid Warcraft Logs regions
@@ -87,17 +96,15 @@ function normalizeCharacterName(name: string): string {
 /**
  * Parse and validate a Warcraft Logs character profile URL
  * 
- * Expected formats:
- * - https://www.warcraftlogs.com/character/us/area-52/playername
- * - https://www.warcraftlogs.com/character/eu/silvermoon/playername
- * - http://www.warcraftlogs.com/character/us/area-52/playername
- * - www.warcraftlogs.com/character/us/area-52/playername
+ * Supported formats:
+ * - https://www.warcraftlogs.com/character/us/area-52/playername (full format)
+ * - https://www.warcraftlogs.com/character/id/64213375 (ID format)
  * 
  * @param url - The Warcraft Logs character URL to parse
- * @returns Parsed character data with normalized region, realm, and character name
+ * @returns Union type with either slug or id format
  * @throws Error with descriptive message if URL is invalid
  */
-export function parseWarcraftLogsCharacterUrl(url: string): ParsedWarcraftLogsCharacter {
+export function parseWarcraftLogsCharacterUrl(url: string): ParsedWarcraftLogsUrl {
   // Validate input
   if (!url || typeof url !== 'string') {
     throw new Error('URL is required and must be a string')
@@ -133,15 +140,16 @@ export function parseWarcraftLogsCharacterUrl(url: string): ParsedWarcraftLogsCh
   const pathname = parsedUrl.pathname
   
   // Expected format: /character/{region}/{realm}/{characterName}
+  // OR: /character/id/{characterId}
   const pathParts = pathname.split('/').filter(part => part !== '')
   
-  if (pathParts.length < 4) {
+  if (pathParts.length < 2) {
     throw new Error(
-      `Invalid URL structure. Expected format: https://www.warcraftlogs.com/character/{region}/{realm}/{characterName}`
+      `Invalid URL structure. Expected format: https://www.warcraftlogs.com/character/{region}/{realm}/{characterName} or https://www.warcraftlogs.com/character/id/{characterId}`
     )
   }
   
-  const [section, region, realm, characterName] = pathParts
+  const [section, secondPart, thirdPart, fourthPart] = pathParts
   
   // Validate section is 'character'
   if (section !== 'character') {
@@ -150,6 +158,35 @@ export function parseWarcraftLogsCharacterUrl(url: string): ParsedWarcraftLogsCh
     )
   }
   
+  // Check if this is an ID-based URL (e.g., /character/id/64213375)
+  if (secondPart === 'id') {
+    if (!thirdPart) {
+      throw new Error('Character ID is missing from URL')
+    }
+    
+    // Validate the character ID (should be numeric)
+    if (!/^\d+$/.test(thirdPart)) {
+      throw new Error(`Invalid character ID '${thirdPart}'. Character ID must be numeric.`)
+    }
+    
+    return {
+      type: 'id',
+      characterId: thirdPart,
+      originalUrl: trimmedUrl,
+    }
+  }
+  
+  // Full format validation
+  if (pathParts.length < 4) {
+    throw new Error(
+      `Invalid URL structure. Expected format: https://www.warcraftlogs.com/character/{region}/{realm}/{characterName}`
+    )
+  }
+  
+  const region = secondPart
+  const realm = thirdPart
+  const characterName = fourthPart
+  
   // Validate and normalize each component
   try {
     const normalizedRegion = normalizeRegion(region)
@@ -157,9 +194,11 @@ export function parseWarcraftLogsCharacterUrl(url: string): ParsedWarcraftLogsCh
     const normalizedCharacterName = normalizeCharacterName(characterName)
     
     return {
+      type: 'slug',
       region: normalizedRegion,
       realm: normalizedRealm,
       characterName: normalizedCharacterName,
+      originalUrl: trimmedUrl,
     }
   } catch (error) {
     // Re-throw validation errors with context
